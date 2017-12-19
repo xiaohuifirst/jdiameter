@@ -54,7 +54,7 @@ fi
 
 
 
-RUN_CLASSPATH="$TEST_CORE/target/example1-1.7.0-SNAPSHOT-jar-with-dependencies.jar"
+RUN_CLASSPATH="$TEST_CORE/target/example1-1.7.1-SNAPSHOT-jar-with-dependencies.jar"
 
 # For Cygwin, switch paths to Windows format before running java
 if $cygwin; then

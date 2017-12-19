@@ -42,24 +42,6 @@
 
 package org.jdiameter.client.impl.fsm;
 
-import static org.jdiameter.client.impl.fsm.FsmState.DOWN;
-import static org.jdiameter.client.impl.fsm.FsmState.REOPEN;
-import static org.jdiameter.client.impl.helpers.Parameters.CeaTimeOut;
-import static org.jdiameter.client.impl.helpers.Parameters.DpaTimeOut;
-import static org.jdiameter.client.impl.helpers.Parameters.DwaTimeOut;
-import static org.jdiameter.client.impl.helpers.Parameters.IacTimeOut;
-import static org.jdiameter.client.impl.helpers.Parameters.PeerFSMThreadCount;
-import static org.jdiameter.client.impl.helpers.Parameters.QueueSize;
-import static org.jdiameter.client.impl.helpers.Parameters.RecTimeOut;
-
-import java.util.Random;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
 import org.jdiameter.api.Configuration;
 import org.jdiameter.api.DisconnectCause;
 import org.jdiameter.api.Message;
@@ -83,6 +65,24 @@ import org.jdiameter.common.api.statistic.IStatisticRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Random;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+import static org.jdiameter.client.impl.fsm.FsmState.DOWN;
+import static org.jdiameter.client.impl.fsm.FsmState.REOPEN;
+import static org.jdiameter.client.impl.helpers.Parameters.CeaTimeOut;
+import static org.jdiameter.client.impl.helpers.Parameters.DpaTimeOut;
+import static org.jdiameter.client.impl.helpers.Parameters.DwaTimeOut;
+import static org.jdiameter.client.impl.helpers.Parameters.IacTimeOut;
+import static org.jdiameter.client.impl.helpers.Parameters.PeerFSMThreadCount;
+import static org.jdiameter.client.impl.helpers.Parameters.QueueSize;
+import static org.jdiameter.client.impl.helpers.Parameters.RecTimeOut;
+
 /**
  *
  * @author erick.svenson@yahoo.com
@@ -96,7 +96,11 @@ public class PeerFSMImpl implements IStateMachine {
   protected final Dictionary dictionary = DictionarySingleton.getDictionary();
 
   protected ConcurrentLinkedQueue<StateChangeListener> listeners;
-  protected LinkedBlockingQueue<StateEvent> eventQueue;
+  //protected LinkedBlockingQueue<StateEvent> eventQueue;
+
+  //将消息分开放在两个队列中
+  protected LinkedBlockingQueue<StateEvent> inEventQueue;
+  protected LinkedBlockingQueue<StateEvent> outEventQueue;
 
   protected FsmState state = FsmState.DOWN;
   protected boolean watchdogSent;
@@ -130,7 +134,10 @@ public class PeerFSMImpl implements IStateMachine {
     this.predefSize = config.getIntValue(QueueSize.ordinal(), (Integer) QueueSize.defValue());
     //PCB added logging
     logger.debug("Maximum FSM Queue size is [{}]", predefSize);
-    this.eventQueue = new LinkedBlockingQueue<StateEvent>(predefSize);
+    //this.eventQueue = new LinkedBlockingQueue<StateEvent>(predefSize);
+    //队列初始化
+    this.inEventQueue = new LinkedBlockingQueue<StateEvent>(predefSize);
+    this.outEventQueue = new LinkedBlockingQueue<StateEvent>(predefSize);
     this.listeners = new ConcurrentLinkedQueue<StateChangeListener>();
     loadTimeOuts(config);
     this.concurrentFactory = concurrentFactory;
@@ -157,13 +164,16 @@ public class PeerFSMImpl implements IStateMachine {
         // runQueueProcessing has been called
         return;
       }
-      eventQueue.clear();
+      //eventQueue.clear();
+      inEventQueue.clear();
+      outEventQueue.clear();
       mustRun = true;
 
       IStatisticRecord queueSize = statisticFactory.newCounterRecord(IStatisticRecord.Counters.QueueSize, new IStatisticRecord.IntegerValueHolder() {
         @Override
         public int getValueAsInt() {
-          return eventQueue.size();
+          //return eventQueue.size();
+          return inEventQueue.size()+outEventQueue.size();
         }
 
         @Override
@@ -200,9 +210,12 @@ public class PeerFSMImpl implements IStateMachine {
           }, timeSumm, timeCount);
 
       logger.debug("Initializing QueueStat @ Thread[{}]", Thread.currentThread().getName());
+      //add by hhp
+      logger.debug("New queueStat for peer: "+context.getPeerDescription());
       queueStat = statisticFactory.newStatistic(context.getPeerDescription(), IStatistic.Groups.PeerFSM, queueSize, messagePrcAverageTime);
       logger.debug("Finished Initializing QueueStat @ Thread[{}]", Thread.currentThread().getName());
 
+      /*
       Runnable fsmQueueProcessor = new Runnable() {
         @Override
         public void run() {
@@ -270,11 +283,99 @@ public class PeerFSMImpl implements IStateMachine {
           logger.debug("Stopping ... [{}] FSM threads are running", runningNowAfterStop);
         }
       };
+      */
+
+      //针对两个队列分别起线程进行处理
+      class FsmQueueProcessor implements Runnable{
+        private LinkedBlockingQueue<StateEvent> eventQueue;
+
+        FsmQueueProcessor(LinkedBlockingQueue<StateEvent> eventQueue){
+          this.eventQueue = eventQueue;
+        }
+
+        @Override
+        public void run() {
+          int runningNow = numberOfThreadsRunning.incrementAndGet();
+          logger.debug("Starting ... [{}] FSM threads are running", runningNow);
+          //PCB changed for multi-thread
+          while (mustRun) {
+            StateEvent event;
+            try {
+              event = eventQueue.poll(100, TimeUnit.MILLISECONDS);
+              if (logger.isDebugEnabled() && event != null) {
+                logger.debug("Got Event [{}] from Queue", event);
+              }
+            }
+            catch (InterruptedException e) {
+              logger.debug("Peer FSM stopped", e);
+              break;
+            }
+            //FIXME: baranowb: why this lock is here?
+            // PCB removed lock
+            // lock.lock();
+            try {
+              if (event != null) {
+                if (event instanceof FsmEvent && queueStat != null && queueStat.isEnabled()) {
+                  timeSumm.inc(System.currentTimeMillis() - ((FsmEvent) event).getCreatedTime());
+                  timeCount.inc();
+                }
+                logger.debug("Process event [{}]. Peer State is [{}]", event, state);
+                getStates()[state.ordinal()].processEvent(event);
+              }
+              if (timer != 0 && timer < System.currentTimeMillis()) {
+                // ZhixiaoLuo: add lock here to avoid 2 timeout events at the same time if 2 threads get into timer=0
+                // ZhixiaoLuo: use double check strategy to avoid locking most normal cases
+                lock.lock();
+                try {
+                  if (timer != 0 && timer < System.currentTimeMillis()) {
+                    timer = 0;
+                    if (state != DOWN) { //without this check this event is fired in DOWN state.... it should not be.
+                      logger.debug("Sending timeout event");
+                      handleEvent(timeOutEvent); //FIXME: check why timer is not killed?
+                    }
+                  }
+                }
+                finally {
+                  lock.unlock();
+                }
+              }
+            }
+            catch (Exception e) {
+              logger.debug("Error during processing FSM event", e);
+            }
+            finally {
+              // PCB removed lock
+              // lock.unlock();
+            }
+          }
+          //PCB added logging
+          logger.debug("FSM Thread {} is exiting", Thread.currentThread().getName());
+          //this happens when peer FSM is down, lets remove stat
+          statisticFactory.removeStatistic(queueStat);
+          logger.debug("Setting QueueStat to null @ Thread [{}]", Thread.currentThread().getName());
+          queueStat = null;
+          logger.debug("Done Setting QueueStat to null @ Thread [{}]", Thread.currentThread().getName());
+          int runningNowAfterStop = numberOfThreadsRunning.decrementAndGet();
+          logger.debug("Stopping ... [{}] FSM threads are running", runningNowAfterStop);
+        }
+      }
+      /*
       //PCB added FSM multithread
       for (int i = 1; i <= FSM_THREAD_COUNT; i++) {
         logger.debug("Starting FSM Thread {} of {}", i, FSM_THREAD_COUNT);
         Thread executor = concurrentFactory.getThread("FSM-" + context.getPeerDescription() + "_" + i, fsmQueueProcessor);
         executor.start();
+      }
+      */
+
+      //PCB added FSM multithread
+      for (int i = 1; i <= (FSM_THREAD_COUNT > 1 ? FSM_THREAD_COUNT/2 : 1); i++) {
+        Thread inExecutor = concurrentFactory.getThread("FSM-" + context.getPeerDescription() + "_" + i, new FsmQueueProcessor(inEventQueue));
+        inExecutor.start();
+      }
+      for (int i = 1; i <= (FSM_THREAD_COUNT > 1 ? FSM_THREAD_COUNT-FSM_THREAD_COUNT/2 : 1); i++) {
+        Thread outExecutor = concurrentFactory.getThread("FSM-" + context.getPeerDescription() + "_" + i, new FsmQueueProcessor(outEventQueue));
+        outExecutor.start();
       }
     }
     finally {
@@ -284,7 +385,8 @@ public class PeerFSMImpl implements IStateMachine {
 
   @Override
   public double getQueueInfo() {
-    return eventQueue.size() * 1.0 / predefSize;
+    //return eventQueue.size() * 1.0 / predefSize;
+    return (inEventQueue.size()+outEventQueue.size()) * 1.0 / predefSize;
   }
 
   protected void loadTimeOuts(Configuration config) {
@@ -323,6 +425,7 @@ public class PeerFSMImpl implements IStateMachine {
     getStates()[state.ordinal()].entryAction();
   }
 
+  //将事件event放入队列eventQueue，event的处理在runQueueProcessing中，runQueueProcessing中单独启动线程处理
   @Override
   public boolean handleEvent(StateEvent event) throws InternalError, OverloadException {
     //if (state.getPublicState() == PeerState.DOWN && event.encodeType(EventTypes.class) == EventTypes.START_EVENT) {
@@ -354,8 +457,8 @@ public class PeerFSMImpl implements IStateMachine {
 
     boolean rc = false;
     try {
-      if (logger.isDebugEnabled()) {
-        logger.debug("Placing event [{}] into linked blocking queue with remaining capacity: [{}].", event, eventQueue.remainingCapacity());
+      //if (logger.isDebugEnabled()) {
+        //logger.debug("Placing event [{}] into linked blocking queue with remaining capacity: [{}].", event, eventQueue.remainingCapacity());
         //PCB added logging
         //int queueSize = eventQueue.size();
         //if (System.currentTimeMillis() - lastLogged > 1000) {
@@ -364,8 +467,20 @@ public class PeerFSMImpl implements IStateMachine {
         //    logger.debug("Diameter Event Queue size is [{}]", queueSize);
         //  }
         //}
+      //}
+      //rc = eventQueue.offer(event, IAC_TIMEOUT, TimeUnit.MILLISECONDS);
+      if(isIncomingEvent((EventTypes)event.getType())){
+        if(logger.isDebugEnabled()){
+          logger.debug("Placing event [{}] into incoming linked blocking queue with remaining capacity: [{}].",event,inEventQueue.remainingCapacity());
+        }
+        rc = inEventQueue.offer(event,IAC_TIMEOUT, TimeUnit.MILLISECONDS);
       }
-      rc = eventQueue.offer(event, IAC_TIMEOUT, TimeUnit.MILLISECONDS);
+      else {
+        if(logger.isDebugEnabled()){
+          logger.debug("Placing event [{}] into outting linked blocking queue with remaining capacity: [{}].",event,outEventQueue.remainingCapacity());
+        }
+        rc = outEventQueue.offer(event,IAC_TIMEOUT,TimeUnit.MILLISECONDS);
+      }
     }
     catch (InterruptedException e) {
       logger.debug("Can not put event '" + event.toString() + "' to FSM " + this.toString(), e);
@@ -375,6 +490,18 @@ public class PeerFSMImpl implements IStateMachine {
       throw new OverloadException("FSM overloaded");
     }
     return true;
+  }
+
+  /**
+   * 判断事件类型是否为收到的事件
+   * @param type
+   * @return
+   */
+  private boolean isIncomingEvent(EventTypes type){
+    if(type == EventTypes.RECEIVE_MSG_EVENT){
+      return true;
+    }
+    return false;
   }
 
   //PCB added logging

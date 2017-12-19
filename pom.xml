@@ -10,7 +10,7 @@
 
   <groupId>org.mobicents.diameter</groupId>
   <artifactId>diameter-parent</artifactId>
-  <version>1.7.0-SNAPSHOT</version>
+  <version>1.7.1-SNAPSHOT</version>
 
   <packaging>pom</packaging>
 
@@ -79,7 +79,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
         <configuration>
-          <additionalparam>-Xdoclint:none</additionalparam>
+          <!--<additionalparam>-Xdoclint:none</additionalparam>-->
         </configuration>
       </plugin>
       <plugin>

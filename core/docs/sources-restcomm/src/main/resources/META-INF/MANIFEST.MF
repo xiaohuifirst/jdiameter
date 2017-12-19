@@ -4,7 +4,7 @@ Created-By: Apache Maven Bundle Plugin
 Built-By: jean
 Build-Jdk: 1.7.0_80
 Implementation-Title: org.mobicents.diameter:diameter-core-docs-sources
-Implementation-Version: 1.7.0-SNAPSHOT
+Implementation-Version: 1.7.1-SNAPSHOT
 Tool: Bnd-1.15.0
 Bundle-Name: Restcomm :: Diameter Documentation :: diameter-core-docs-
  sources
