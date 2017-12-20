@@ -42,19 +42,21 @@
 
 package org.jdiameter.common.impl.statistic;
 
+import org.jdiameter.api.Configuration;
+import org.jdiameter.client.impl.helpers.Parameters;
+import org.jdiameter.common.api.statistic.IStatistic;
+import org.jdiameter.common.api.statistic.IStatisticManager;
+import org.jdiameter.common.api.statistic.IStatisticRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.jdiameter.api.Configuration;
-import org.jdiameter.client.impl.helpers.Parameters;
-import org.jdiameter.common.api.statistic.IStatistic;
-import org.jdiameter.common.api.statistic.IStatisticManager;
-import org.jdiameter.common.api.statistic.IStatisticRecord;
-
-/**
+ /**
  *
  * @author <a href="mailto:brainslog@gmail.com"> Alexandre Mendonca </a>
  * @author <a href="mailto:baranowb@gmail.com"> Bartosz Baranowski </a>
@@ -71,6 +73,7 @@ public class StatisticManagerImpl implements IStatisticManager {
   private boolean enabled;
   private long pause, delay;
   private Set<String> activeRecords; //list of stats enabled on start
+  private final Logger logger = LoggerFactory.getLogger(StatisticManagerImpl.class);
 
 
   public StatisticManagerImpl(Configuration config) {

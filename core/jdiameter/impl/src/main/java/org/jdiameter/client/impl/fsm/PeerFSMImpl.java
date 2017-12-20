@@ -125,7 +125,7 @@ public class PeerFSMImpl implements IStateMachine {
   protected IStatisticRecord timeCount;
 
   //PCB changed for multi-thread
-  protected boolean mustRun = false;
+  protected volatile boolean mustRun = false;
   protected AtomicInteger numberOfThreadsRunning = new AtomicInteger(0);
 
   public PeerFSMImpl(IContext aContext, IConcurrentFactory concurrentFactory, Configuration config, IStatisticManager statisticFactory) {
@@ -352,6 +352,7 @@ public class PeerFSMImpl implements IStateMachine {
           logger.debug("FSM Thread {} is exiting", Thread.currentThread().getName());
           //this happens when peer FSM is down, lets remove stat
           statisticFactory.removeStatistic(queueStat);
+          logger.info("FSM Thread remove queueStat success. QueueStat:" +queueStat);
           logger.debug("Setting QueueStat to null @ Thread [{}]", Thread.currentThread().getName());
           queueStat = null;
           logger.debug("Done Setting QueueStat to null @ Thread [{}]", Thread.currentThread().getName());
@@ -370,11 +371,13 @@ public class PeerFSMImpl implements IStateMachine {
 
       //PCB added FSM multithread
       for (int i = 1; i <= (FSM_THREAD_COUNT > 1 ? FSM_THREAD_COUNT/2 : 1); i++) {
-        Thread inExecutor = concurrentFactory.getThread("FSM-" + context.getPeerDescription() + "_" + i, new FsmQueueProcessor(inEventQueue));
+        Thread inExecutor = concurrentFactory.getThread("FSMIN-" + context.getPeerDescription()
+                + "_" + i, new FsmQueueProcessor(inEventQueue));
         inExecutor.start();
       }
       for (int i = 1; i <= (FSM_THREAD_COUNT > 1 ? FSM_THREAD_COUNT-FSM_THREAD_COUNT/2 : 1); i++) {
-        Thread outExecutor = concurrentFactory.getThread("FSM-" + context.getPeerDescription() + "_" + i, new FsmQueueProcessor(outEventQueue));
+        Thread outExecutor = concurrentFactory.getThread("FSMOUT-" + context.getPeerDescription()
+                + "_" + i, new FsmQueueProcessor(outEventQueue));
         outExecutor.start();
       }
     }

@@ -42,12 +42,12 @@
 
 package org.jdiameter.common.impl.statistic;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
-
 import org.jdiameter.api.StatisticRecord;
 import org.jdiameter.common.api.statistic.IStatistic;
 import org.jdiameter.common.api.statistic.IStatisticRecord;
 import org.jdiameter.common.api.statistic.IStatisticRecord.Counters;
+
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  *
@@ -150,7 +150,8 @@ class StatisticImpl implements IStatistic {
 
   @Override
   public String toString() {
-    return "Statistic{" + " records=" + records + " }";
+    return "Statistic{" + " name=" + name + " description=" + description
+            + " group=" + group + " records=" + records + " }";
   }
 
   @Override
