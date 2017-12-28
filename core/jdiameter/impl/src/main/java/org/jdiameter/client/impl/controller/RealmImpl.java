@@ -42,15 +42,15 @@
 
 package org.jdiameter.client.impl.controller;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.concurrent.ConcurrentLinkedQueue;
-
 import org.jdiameter.api.ApplicationId;
 import org.jdiameter.api.LocalAction;
 import org.jdiameter.client.api.controller.IRealm;
 import org.jdiameter.server.api.agent.IAgent;
 import org.jdiameter.server.api.agent.IAgentConfiguration;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * The Realm class implements rows in the Diameter Realm routing table.
@@ -123,7 +123,7 @@ public class RealmImpl implements IRealm {
   /**
    * Append new host (peer) to this realm
    *
-   * @param host
+   * @param name
    *          name of peer host
    */
   @Override
@@ -136,11 +136,11 @@ public class RealmImpl implements IRealm {
   /**
    * Remove peer from this realm
    *
-   * @param host
+   * @param name
    *          name of peer host
    */
   @Override
-  public void removePeerName(String s) {
+  public void removePeerName(String name) {
     hosts.remove(name);
   }
 
