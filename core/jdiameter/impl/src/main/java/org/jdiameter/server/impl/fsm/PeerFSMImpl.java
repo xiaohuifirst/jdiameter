@@ -42,30 +42,32 @@
 
 package org.jdiameter.server.impl.fsm;
 
-import static org.jdiameter.client.impl.fsm.FsmState.DOWN;
-import static org.jdiameter.client.impl.fsm.FsmState.INITIAL;
-import static org.jdiameter.client.impl.fsm.FsmState.OKAY;
-import static org.jdiameter.client.impl.fsm.FsmState.STOPPING;
-import static org.jdiameter.client.impl.fsm.FsmState.SUSPECT;
+ import org.jdiameter.api.Avp;
+ import org.jdiameter.api.AvpDataException;
+ import org.jdiameter.api.Configuration;
+ import org.jdiameter.api.ConfigurationListener;
+ import org.jdiameter.api.DisconnectCause;
+ import org.jdiameter.api.MutableConfiguration;
+ import org.jdiameter.api.ResultCode;
+ import org.jdiameter.api.app.State;
+ import org.jdiameter.api.app.StateEvent;
+ import org.jdiameter.client.api.IMessage;
+ import org.jdiameter.client.api.fsm.IContext;
+ import org.jdiameter.common.api.concurrent.IConcurrentFactory;
+ import org.jdiameter.common.api.statistic.IStatisticManager;
+ import org.jdiameter.server.api.IStateMachine;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
 
-import org.jdiameter.api.Avp;
-import org.jdiameter.api.AvpDataException;
-import org.jdiameter.api.Configuration;
-import org.jdiameter.api.ConfigurationListener;
-import org.jdiameter.api.DisconnectCause;
-import org.jdiameter.api.MutableConfiguration;
-import org.jdiameter.api.ResultCode;
-import org.jdiameter.api.app.State;
-import org.jdiameter.api.app.StateEvent;
-import org.jdiameter.client.api.IMessage;
-import org.jdiameter.client.api.fsm.IContext;
-import org.jdiameter.common.api.concurrent.IConcurrentFactory;
-import org.jdiameter.common.api.statistic.IStatisticManager;
-import org.jdiameter.server.api.IStateMachine;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+ import java.io.IOException;
 
-/**
+ import static org.jdiameter.client.impl.fsm.FsmState.DOWN;
+ import static org.jdiameter.client.impl.fsm.FsmState.INITIAL;
+ import static org.jdiameter.client.impl.fsm.FsmState.OKAY;
+ import static org.jdiameter.client.impl.fsm.FsmState.STOPPING;
+ import static org.jdiameter.client.impl.fsm.FsmState.SUSPECT;
+
+ /**
  *
  * @author <a href="mailto:brainslog@gmail.com"> Alexandre Mendonca </a>
  * @author <a href="mailto:baranowb@gmail.com"> Bartosz Baranowski </a>
@@ -341,6 +343,12 @@ public class PeerFSMImpl extends org.jdiameter.client.impl.fsm.PeerFSMImpl imple
                     setTimer(CEA_TIMEOUT);
                     switchToNextState(INITIAL);
                   }
+                  catch (IOException e){
+                    logger.error("Connect OCG error: "+ e.toString());
+                    logger.error("Mabey the Node:{} in ZK is not available.", context.getPeerDescription());
+                    logger.info("Go to ReOpen the ocgClient: "+context.getPeerDescription());
+                    doEndConnection();
+                  }
                   catch (Throwable e) {
                     logger.debug("Connect error", e);
                     doEndConnection();
@@ -406,7 +414,8 @@ public class PeerFSMImpl extends org.jdiameter.client.impl.fsm.PeerFSMImpl imple
                     context.connect();
                   }
                   catch (Exception e) {
-                    logger.debug("Can not connect to remote peer", e);
+                    logger.info("Can not connect to remote OCG peer: "+ e.toString());
+                    logger.info("Reopen the Ocg Peer:"+context.getPeerDescription());
                     setTimer(REC_TIMEOUT);
                   }
                   break;

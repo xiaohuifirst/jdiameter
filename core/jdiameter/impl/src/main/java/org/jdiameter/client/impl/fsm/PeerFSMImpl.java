@@ -142,7 +142,8 @@ public class PeerFSMImpl implements IStateMachine {
     loadTimeOuts(config);
     this.concurrentFactory = concurrentFactory;
     FSM_THREAD_COUNT = config.getIntValue(PeerFSMThreadCount.ordinal(), (Integer) PeerFSMThreadCount.defValue());
-    runQueueProcessing();
+    //直接在START_EVENT中启动这个东西，省的出问题
+    //runQueueProcessing();
   }
 
   @Override
@@ -214,7 +215,6 @@ public class PeerFSMImpl implements IStateMachine {
       logger.debug("New queueStat for peer: "+context.getPeerDescription());
       queueStat = statisticFactory.newStatistic(context.getPeerDescription(), IStatistic.Groups.PeerFSM, queueSize, messagePrcAverageTime);
       logger.debug("Finished Initializing QueueStat @ Thread[{}]", Thread.currentThread().getName());
-
       /*
       Runnable fsmQueueProcessor = new Runnable() {
         @Override
@@ -370,6 +370,7 @@ public class PeerFSMImpl implements IStateMachine {
       */
 
       //PCB added FSM multithread
+      logger.debug("Starting inEventQueue process, FSM_THREAD_COUNT is " + FSM_THREAD_COUNT);
       for (int i = 1; i <= (FSM_THREAD_COUNT > 1 ? FSM_THREAD_COUNT/2 : 1); i++) {
         Thread inExecutor = concurrentFactory.getThread("FSMIN-" + context.getPeerDescription()
                 + "_" + i, new FsmQueueProcessor(inEventQueue));

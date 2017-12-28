@@ -1,4 +1,5 @@
 mvn clean deploy -D maven.javadoc.skip=true
+
 nexus-staging-maven-plugin插件不好使...
 
 # jdiameter

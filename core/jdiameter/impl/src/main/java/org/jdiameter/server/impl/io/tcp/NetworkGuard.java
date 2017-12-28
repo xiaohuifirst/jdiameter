@@ -43,7 +43,15 @@
 package org.jdiameter.server.impl.io.tcp;
 
 
-import static org.jdiameter.server.impl.helpers.Parameters.BindDelay;
+import org.jdiameter.client.api.parser.IMessageParser;
+import org.jdiameter.client.impl.transport.tcp.TCPClientConnection;
+import org.jdiameter.common.api.concurrent.DummyConcurrentFactory;
+import org.jdiameter.common.api.concurrent.IConcurrentFactory;
+import org.jdiameter.server.api.IMetaData;
+import org.jdiameter.server.api.io.INetworkConnectionListener;
+import org.jdiameter.server.api.io.INetworkGuard;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -62,15 +70,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.jdiameter.client.api.parser.IMessageParser;
-import org.jdiameter.client.impl.transport.tcp.TCPClientConnection;
-import org.jdiameter.common.api.concurrent.DummyConcurrentFactory;
-import org.jdiameter.common.api.concurrent.IConcurrentFactory;
-import org.jdiameter.server.api.IMetaData;
-import org.jdiameter.server.api.io.INetworkConnectionListener;
-import org.jdiameter.server.api.io.INetworkGuard;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.jdiameter.server.impl.helpers.Parameters.BindDelay;
 
 /**
  * TCP implementation of {@link org.jdiameter.server.api.io.INetworkGuard}.
@@ -190,6 +190,9 @@ public class NetworkGuard implements INetworkGuard {
             logger.info("Open server socket {} ", serverSocket);
           }
           catch (IOException e) {
+            logger.error("OCPServer binding {} defeate. OCPServer端口被占用!",addr);
+            //直接退出
+            System.exit(-1);
             throw new RuntimeException(e);
           }
         }

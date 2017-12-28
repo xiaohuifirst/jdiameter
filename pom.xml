@@ -84,6 +84,7 @@
       <id>snapshots</id>
       <name>Snapshots</name>
       <url>http://10.142.90.52:8081/nexus/content/repositories/snapshots</url>
+      <uniqueVersion>false</uniqueVersion>
     </snapshotRepository>
   </distributionManagement>
 
@@ -104,6 +105,7 @@
         <configuration>
           <serverId>restcomm-releases-repository</serverId>
           <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+          <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
         </configuration>
         <executions>
           <execution>
@@ -269,6 +271,18 @@
             </goals>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.4</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <useUniqueVersions>false</useUniqueVersions>
+            </manifest>
+          </archive>
+        </configuration>
       </plugin>
     </plugins>
   </build>
